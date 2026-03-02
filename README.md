@@ -2,11 +2,15 @@
 
 <img src="https://zubax.com/static/assets/logos/zubax-logo-modern.svg" width="130px">
 
-<h1>Letopisec</h1>
+<h1>Nestor</h1>
+
+<img src="data/Нестор-летописец.jpg" width="210px" alt="Nestor">
+
+[Nestor The Chronicler](https://en.wikipedia.org/wiki/Nestor_the_Chronicler)
 
 _Data collection server for CF3D CAN black box recorders_
 
-[![CI](https://github.com/Zubax/letopisec/actions/workflows/ci.yml/badge.svg)](https://github.com/Zubax/letopisec/actions/workflows/ci.yml)
+[![CI](https://github.com/Zubax/nestor/actions/workflows/ci.yml/badge.svg)](https://github.com/Zubax/nestor/actions/workflows/ci.yml)
 [![Website](https://img.shields.io/badge/website-zubax.com-black?color=e00000)](https://zubax.com/)
 [![Forum](https://img.shields.io/discourse/https/forum.zubax.com/users.svg?logo=discourse&color=e00000)](https://forum.zubax.com)
 
@@ -28,7 +32,7 @@ graph TD
 
     CF3D == "📡 auto-upload over Wi-Fi<br/>during service/maintenance<br/>fully unattended" ==> COMMIT
 
-    subgraph LETOPISEC["💾 Letopisec Server"]
+    subgraph NESTOR["💾 Nestor Server"]
         COMMIT["Ingest<br/>FEC repair records"] --> DB[("SQLite<br/>append-only · idempotent<br/>airgap-safe")]
         DB --> API["REST API<br/>devices · boots · records<br/>filtering · long-polling"]
     end
@@ -62,8 +66,8 @@ For details, please reach out to <sales@zubax.com>.
 Install and run the server at the default endpoint <http://0.0.0.0:8000>
 
 ```bash
-pip install letopisec   # For development, use `pip install -e .` for editable installation
-letopisec serve         # See --help for extra info.
+pip install nestor   # For development, use `pip install -e .` for editable installation
+nestor serve         # See --help for extra info.
 ```
 
 Open the API docs at the `/docs` endpoint in your browser, e.g., <http://localhost:8000/docs>.
@@ -71,26 +75,26 @@ Open the API docs at the `/docs` endpoint in your browser, e.g., <http://localho
 Run behind a local gateway via Unix socket:
 
 ```bash
-letopisec serve --uds /run/letopisec/letopisec.sock
+nestor serve --uds /run/nestor/nestor.sock
 ```
 
-Every runtime option can be configured with env vars like `LETOPISEC_HOST`/`.._PORT`, `LETOPISEC_DB_PATH`, etc.
+Every runtime option can be configured with env vars like `NESTOR_HOST`/`.._PORT`, `NESTOR_DB_PATH`, etc.
 CLI arguments override environment values.
 
 ### Store and retrieve CAN frames
 
 Configure Zubax CANFace CF3D devices to use the endpoint where the server is running.
-Existing dumps from CF3D memory cards can also be uploaded manually using [`letopisec_ingest.py`](tools/letopisec_ingest.py).
+Existing dumps from CF3D memory cards can also be uploaded manually using [`nestor_ingest.py`](tools/nestor_ingest.py).
 
 ### Gateway integration
 
 You can run the ASGI app through an external process manager/gateway using the app factory:
 
 ```bash
-export LETOPISEC_DB_PATH=/var/lib/letopisec/letopisec.db
-export LETOPISEC_LOG_FILE=/var/log/letopisec/server.log
-export LETOPISEC_LOG_LEVEL=INFO
-uvicorn --factory letopisec.server:create_app_from_env
+export NESTOR_DB_PATH=/var/lib/nestor/nestor.db
+export NESTOR_LOG_FILE=/var/log/nestor/server.log
+export NESTOR_LOG_LEVEL=INFO
+uvicorn --factory nestor.server:create_app_from_env
 ```
 
 ## API endpoints

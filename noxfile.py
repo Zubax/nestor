@@ -4,7 +4,7 @@ from pathlib import Path
 
 import nox
 
-PACKAGE_DIR = Path("letopisec")
+PACKAGE_DIR = Path("nestor")
 EXCLUDED_TEST_FILE = "__main__.py"
 E2E_SCRIPT_PATH = Path("tools") / "e2e_test.py"
 SERVE_SMOKE_SCRIPT_PATH = Path("tools") / "serve_smoke_test.py"
@@ -32,7 +32,7 @@ def tests(session: nox.Session) -> None:
         "--source",
         PACKAGE_DIR.name,
         "--omit",
-        "*/letopisec/__main__.py",
+        "*/nestor/__main__.py",
         "-m",
         "unittest",
         *modules,
@@ -42,7 +42,7 @@ def tests(session: nox.Session) -> None:
         "report",
         "-m",
         "--omit",
-        "*/letopisec/__main__.py",
+        "*/nestor/__main__.py",
         "--fail-under=80",
     )
 
@@ -72,4 +72,4 @@ def black(session: nox.Session) -> None:
 @nox.session
 def mypy(session: nox.Session) -> None:
     session.install("mypy", ".")
-    session.run("mypy", "letopisec")
+    session.run("mypy", "nestor")

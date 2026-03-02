@@ -15,9 +15,9 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from letopisec.database import Boot, Database, DeviceInfo, SqliteDatabase
-from letopisec.fec_envelope import RECORD_BYTES, USER_DATA_BYTES, UnboxError, box, unbox
-from letopisec.model import (
+from nestor.database import Boot, Database, DeviceInfo, SqliteDatabase
+from nestor.fec_envelope import RECORD_BYTES, USER_DATA_BYTES, UnboxError, box, unbox
+from nestor.model import (
     CAN_EFF_FLAG,
     CAN_ERR_FLAG,
     CAN_RTR_FLAG,
@@ -1366,7 +1366,7 @@ class _RestAPITests(unittest.TestCase):
         wake_record = self._make_committed_record(seqno=9, boot_id=1, commit_ts=1704067200)
         self.database.records_script_by_device["alpha"] = [[], [wake_record]]
 
-        with patch("letopisec.rest_api.WAIT_POLL_INTERVAL_S", 0.01):
+        with patch("nestor.rest_api.WAIT_POLL_INTERVAL_S", 0.01):
             response = self.client.get(
                 "/cf3d/api/v1/records",
                 params={"device": "alpha", "boot_id": 1, "seqno_min": 9, "wait_timeout_s": 1},
@@ -1380,7 +1380,7 @@ class _RestAPITests(unittest.TestCase):
     def test_get_records_long_poll_timeout_returns_empty_without_timed_out_field(self) -> None:
         self.database.records_script_by_device["alpha"] = [[], [], [], []]
 
-        with patch("letopisec.rest_api.WAIT_POLL_INTERVAL_S", 0.01):
+        with patch("nestor.rest_api.WAIT_POLL_INTERVAL_S", 0.01):
             response = self.client.get(
                 "/cf3d/api/v1/records",
                 params={"device": "alpha", "boot_id": 1, "seqno_min": 101, "wait_timeout_s": 1},

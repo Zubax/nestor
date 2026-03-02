@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "letopisec"
+name = "nestor"
 dynamic = ["version"]
 description = "Log upload server for Zubax CANFace CF3D"
 readme = "README.md"
@@ -17,13 +17,13 @@ authors = [
 ]
 
 [tool.setuptools]
-packages = ["letopisec"]
+packages = ["nestor"]
 
 [tool.setuptools.dynamic]
-version = { attr = "letopisec.__version__" }
+version = { attr = "nestor.__version__" }
 
 [project.scripts]
-letopisec = "letopisec.__main__:main"
+nestor = "nestor.__main__:main"
 
 [tool.black]
 line-length = 120

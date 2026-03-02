@@ -16,28 +16,28 @@ from unittest.mock import Mock, patch
 
 from fastapi import FastAPI
 
-from letopisec.database import SqliteDatabase
-from letopisec.rest_api import create_app
+from nestor.database import SqliteDatabase
+from nestor.rest_api import create_app
 
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
-DEFAULT_DB_PATH = "./letopisec.db"
+DEFAULT_DB_PATH = "./nestor.db"
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_LOG_FILE = "./letopisec.log"
+DEFAULT_LOG_FILE = "./nestor.log"
 DEFAULT_LOG_MAX_BYTES = 128 * 1024 * 1024
 DEFAULT_LOG_BACKUP_COUNT = 20
 
-ENV_HOST = "LETOPISEC_HOST"
-ENV_PORT = "LETOPISEC_PORT"
-ENV_DB_PATH = "LETOPISEC_DB_PATH"
-ENV_UDS = "LETOPISEC_UDS"
-ENV_ROOT_PATH = "LETOPISEC_ROOT_PATH"
-ENV_LOG_LEVEL = "LETOPISEC_LOG_LEVEL"
-ENV_LOG_FILE = "LETOPISEC_LOG_FILE"
-ENV_LOG_MAX_BYTES = "LETOPISEC_LOG_MAX_BYTES"
-ENV_LOG_BACKUP_COUNT = "LETOPISEC_LOG_BACKUP_COUNT"
+ENV_HOST = "NESTOR_HOST"
+ENV_PORT = "NESTOR_PORT"
+ENV_DB_PATH = "NESTOR_DB_PATH"
+ENV_UDS = "NESTOR_UDS"
+ENV_ROOT_PATH = "NESTOR_ROOT_PATH"
+ENV_LOG_LEVEL = "NESTOR_LOG_LEVEL"
+ENV_LOG_FILE = "NESTOR_LOG_FILE"
+ENV_LOG_MAX_BYTES = "NESTOR_LOG_MAX_BYTES"
+ENV_LOG_BACKUP_COUNT = "NESTOR_LOG_BACKUP_COUNT"
 
 _VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _ANSI_RESET = "\x1b[0m"
@@ -147,8 +147,8 @@ def parse_serve_config(argv: Sequence[str] | None = None, env: Mapping[str, str]
     )
 
     parser = argparse.ArgumentParser(
-        prog="letopisec serve",
-        description="Run Letopisec CF3D REST API server",
+        prog="nestor serve",
+        description="Run Nestor CF3D REST API server",
     )
     parser.add_argument("--host", default=host_default, help=f"TCP bind host (env: {ENV_HOST})")
     parser.add_argument(
@@ -371,10 +371,10 @@ class _ServerTests(unittest.TestCase):
             ENV_HOST: "127.0.0.1",
             ENV_PORT: "9001",
             ENV_DB_PATH: "/tmp/env-db.sqlite3",
-            ENV_UDS: "/tmp/letopisec.sock",
+            ENV_UDS: "/tmp/nestor.sock",
             ENV_ROOT_PATH: "/gw",
             ENV_LOG_LEVEL: "warning",
-            ENV_LOG_FILE: "/tmp/letopisec.log",
+            ENV_LOG_FILE: "/tmp/nestor.log",
             ENV_LOG_MAX_BYTES: "4096",
             ENV_LOG_BACKUP_COUNT: "7",
         }
@@ -382,10 +382,10 @@ class _ServerTests(unittest.TestCase):
         self.assertEqual("127.0.0.1", config.host)
         self.assertEqual(9001, config.port)
         self.assertEqual("/tmp/env-db.sqlite3", config.db_path)
-        self.assertEqual("/tmp/letopisec.sock", config.uds)
+        self.assertEqual("/tmp/nestor.sock", config.uds)
         self.assertEqual("/gw", config.root_path)
         self.assertEqual("WARNING", config.log_level)
-        self.assertEqual("/tmp/letopisec.log", config.log_file)
+        self.assertEqual("/tmp/nestor.log", config.log_file)
         self.assertEqual(4096, config.log_max_bytes)
         self.assertEqual(7, config.log_backup_count)
 
@@ -416,7 +416,7 @@ class _ServerTests(unittest.TestCase):
 
     def test_build_database_creates_missing_parent_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "nested" / "deeper" / "letopisec.sqlite3"
+            db_path = Path(temp_dir) / "nested" / "deeper" / "nestor.sqlite3"
             config = ServeConfig(db_path=str(db_path))
             database = build_database(config)
             try:
@@ -439,7 +439,7 @@ class _ServerTests(unittest.TestCase):
 
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                log_file = Path(temp_dir) / "logs" / "letopisec.log"
+                log_file = Path(temp_dir) / "logs" / "nestor.log"
                 config = ServeConfig(log_file=str(log_file), log_level="INFO")
                 configure_logging(config)
 
@@ -482,9 +482,9 @@ class _ServerTests(unittest.TestCase):
 
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                log_file = Path(temp_dir) / "logs" / "letopisec.log"
+                log_file = Path(temp_dir) / "logs" / "nestor.log"
                 config = ServeConfig(log_file=str(log_file), log_level="INFO")
-                with patch("letopisec.server._should_color_stderr", return_value=True):
+                with patch("nestor.server._should_color_stderr", return_value=True):
                     configure_logging(config)
 
                 stream_handlers = [
@@ -499,7 +499,7 @@ class _ServerTests(unittest.TestCase):
                 self.assertIsInstance(formatter, _StderrColorFormatter)
 
                 record = logging.LogRecord(
-                    name="letopisec.server",
+                    name="nestor.server",
                     level=logging.WARNING,
                     pathname=__file__,
                     lineno=0,
@@ -510,7 +510,7 @@ class _ServerTests(unittest.TestCase):
                 rendered = formatter.format(record)
                 self.assertIn("\x1b[", rendered)
                 self.assertIn("WARNING", rendered)
-                self.assertIn("letopisec.server", rendered)
+                self.assertIn("nestor.server", rendered)
         finally:
             for handler in list(root_logger.handlers):
                 root_logger.removeHandler(handler)
@@ -526,9 +526,9 @@ class _ServerTests(unittest.TestCase):
 
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                log_file = Path(temp_dir) / "logs" / "letopisec.log"
+                log_file = Path(temp_dir) / "logs" / "nestor.log"
                 config = ServeConfig(log_file=str(log_file), log_level="INFO")
-                with patch("letopisec.server._should_color_stderr", return_value=False):
+                with patch("nestor.server._should_color_stderr", return_value=False):
                     configure_logging(config)
 
                 stream_handlers = [
@@ -565,9 +565,9 @@ class _ServerTests(unittest.TestCase):
         fake_app = object()
 
         with (
-            patch("letopisec.server.configure_logging") as mocked_configure,
-            patch("letopisec.server.build_database", return_value=fake_database) as mocked_build_db,
-            patch("letopisec.server.create_app", return_value=fake_app) as mocked_create_app,
+            patch("nestor.server.configure_logging") as mocked_configure,
+            patch("nestor.server.build_database", return_value=fake_database) as mocked_build_db,
+            patch("nestor.server.create_app", return_value=fake_app) as mocked_create_app,
             patch.dict(sys.modules, {"uvicorn": fake_uvicorn}),
         ):
             serve(config)
@@ -587,16 +587,16 @@ class _ServerTests(unittest.TestCase):
 
     def test_serve_invokes_uvicorn_with_uds(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            uds_path = Path(temp_dir) / "run" / "letopisec.sock"
+            uds_path = Path(temp_dir) / "run" / "nestor.sock"
             config = ServeConfig(uds=str(uds_path))
             fake_uvicorn = types.SimpleNamespace(run=Mock())
             fake_database = Mock()
             fake_app = object()
 
             with (
-                patch("letopisec.server.configure_logging"),
-                patch("letopisec.server.build_database", return_value=fake_database),
-                patch("letopisec.server.create_app", return_value=fake_app),
+                patch("nestor.server.configure_logging"),
+                patch("nestor.server.build_database", return_value=fake_database),
+                patch("nestor.server.create_app", return_value=fake_app),
                 patch.dict(sys.modules, {"uvicorn": fake_uvicorn}),
             ):
                 serve(config)
@@ -612,10 +612,10 @@ class _ServerTests(unittest.TestCase):
         fake_app = Mock(spec=FastAPI)
 
         with (
-            patch("letopisec.server.parse_serve_config", return_value=config) as mocked_parse,
-            patch("letopisec.server.configure_logging") as mocked_logging,
-            patch("letopisec.server.build_database", return_value=fake_database) as mocked_database,
-            patch("letopisec.server.create_app", return_value=fake_app) as mocked_create_app,
+            patch("nestor.server.parse_serve_config", return_value=config) as mocked_parse,
+            patch("nestor.server.configure_logging") as mocked_logging,
+            patch("nestor.server.build_database", return_value=fake_database) as mocked_database,
+            patch("nestor.server.create_app", return_value=fake_app) as mocked_create_app,
         ):
             out = create_app_from_env()
 

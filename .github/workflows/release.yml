@@ -58,7 +58,7 @@ jobs:
           fi
 
           version="$(python - <<'PY'
-          from letopisec import __version__
+          from nestor import __version__
           print(__version__)
           PY
           )"

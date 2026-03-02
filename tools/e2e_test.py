@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Standalone end-to-end validator for Letopisec.
+Standalone end-to-end validator for Nestor.
 
 Why this exists:
 - The nox session should stay small and orchestration-heavy logic belongs in a dedicated script.
-- The test exercises the real process boundary (`letopisec serve`) plus the real uploader tool
-  (`tools/letopisec_ingest.py`) and then verifies query endpoints.
+- The test exercises the real process boundary (`nestor serve`) plus the real uploader tool
+  (`tools/nestor_ingest.py`) and then verifies query endpoints.
 - The validation dataset (`data/0000000.cf3d`) is treated as a golden input fixture.
 
 Success criteria:
@@ -28,9 +28,9 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-LOGGER = logging.getLogger("letopisec_e2e")
+LOGGER = logging.getLogger("nestor_e2e")
 DEFAULT_DATASET_PATH = Path("data") / "0000000.cf3d"
-DEFAULT_INGEST_SCRIPT_PATH = Path("tools") / "letopisec_ingest.py"
+DEFAULT_INGEST_SCRIPT_PATH = Path("tools") / "nestor_ingest.py"
 DEFAULT_DEVICE_UID = "0x123"
 DEFAULT_DEVICE = "e2e-dataset"
 DEFAULT_READINESS_TIMEOUT_S = 30.0
@@ -47,12 +47,12 @@ def _configure_logging() -> None:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="End-to-end Letopisec test: serve + ingest + retrieval")
+    parser = argparse.ArgumentParser(description="End-to-end Nestor test: serve + ingest + retrieval")
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET_PATH), help="Path to .cf3d validation dataset")
     parser.add_argument(
         "--ingest-script",
         default=str(DEFAULT_INGEST_SCRIPT_PATH),
-        help="Path to ingest script (tools/letopisec_ingest.py)",
+        help="Path to ingest script (tools/nestor_ingest.py)",
     )
     parser.add_argument("--device-uid", default=DEFAULT_DEVICE_UID, help="Device UID string passed to ingest script")
     parser.add_argument("--device", default=DEFAULT_DEVICE, help="Device identifier passed to ingest script")
@@ -190,14 +190,14 @@ def run(argv: list[str] | None = None) -> int:
         device,
     )
 
-    with tempfile.TemporaryDirectory(prefix="letopisec-e2e-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="nestor-e2e-") as temp_dir:
         # Isolate all runtime artifacts (DB + logs + captured stdio) in a temp directory so
         # each run is hermetic and leaves no persistent state behind.
         temp_root = Path(temp_dir)
-        db_path = temp_root / "letopisec-e2e.db"
-        log_path = temp_root / "letopisec-e2e.log"
-        stdout_path = temp_root / "letopisec-e2e.stdout.log"
-        stderr_path = temp_root / "letopisec-e2e.stderr.log"
+        db_path = temp_root / "nestor-e2e.db"
+        log_path = temp_root / "nestor-e2e.log"
+        stdout_path = temp_root / "nestor-e2e.stdout.log"
+        stderr_path = temp_root / "nestor-e2e.stderr.log"
         port = _pick_free_port()
         base_url = f"http://127.0.0.1:{port}"
         LOGGER.debug(
@@ -215,7 +215,7 @@ def run(argv: list[str] | None = None) -> int:
                 [
                     sys.executable,
                     "-m",
-                    "letopisec",
+                    "nestor",
                     "serve",
                     "--host",
                     "127.0.0.1",
