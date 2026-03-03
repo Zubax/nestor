@@ -33,6 +33,8 @@ WAIT_MAX_TIMEOUT_S = 30
 WAIT_POLL_INTERVAL_S = 0.25
 RECORDS_DEFAULT_LIMIT = 1000
 RECORDS_MAX_LIMIT = 10000
+DEVICE_UID_MIN = 0
+DEVICE_UID_MAX = (1 << 64) - 1
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter()
@@ -133,15 +135,29 @@ def _serialize_device_info(device: DeviceInfo) -> DeviceDTO:
 
 
 def _parse_device_uid(
-    device_uid: Annotated[str, Query(min_length=1, description="Integer literal (auto-radix)")],
+    device_uid: Annotated[str, Query(min_length=1, description="uint64 integer literal (auto-radix)")],
 ) -> int:
     try:
-        return int(device_uid, 0)
+        value = int(device_uid, 0)
     except ValueError as ex:
+        LOGGER.warning("Commit request rejected due to invalid device_uid literal: %r", device_uid)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="device_uid must be an integer literal (auto-radix)",
         ) from ex
+    if value < DEVICE_UID_MIN or value > DEVICE_UID_MAX:
+        LOGGER.warning(
+            "Commit request rejected due to out-of-range device_uid: raw=%r parsed=%d allowed=[%d,%d]",
+            device_uid,
+            value,
+            DEVICE_UID_MIN,
+            DEVICE_UID_MAX,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"device_uid must be in range [{DEVICE_UID_MIN}, {DEVICE_UID_MAX}]",
+        )
+    return value
 
 
 def get_database(request: Request) -> Database:
@@ -1125,6 +1141,34 @@ class _RestAPITests(unittest.TestCase):
                 committed_uids.append(self.database.commits[-1][0])
         self.assertEqual([16, 16, 16, 16], committed_uids)
 
+    def test_commit_uint64_device_uid_above_signed_range_is_accepted(self) -> None:
+        expected = self._make_record(
+            seqno=7,
+            boot_id=3,
+            hw_ts_us=123456,
+            can_id_with_flags=0x123,
+            data=b"\xaa",
+        )
+        payload = box(_pack_unboxed_commit_record_v0(expected))
+        with _import_test_client_class()(create_app(SqliteDatabase())) as local_client:
+            commit_response = local_client.post(
+                "/cf3d/api/v1/commit",
+                params={
+                    "device_uid": "15077748194817838259",
+                    "device": "uid-overflow-test-device",
+                },
+                content=payload,
+            )
+            self.assertEqual(200, commit_response.status_code)
+            self.assertEqual("7", commit_response.text)
+
+            devices_response = local_client.get("/cf3d/api/v1/devices")
+            self.assertEqual(200, devices_response.status_code)
+            devices = devices_response.json()["devices"]
+            self.assertEqual(1, len(devices))
+            self.assertEqual("uid-overflow-test-device", devices[0]["device"])
+            self.assertEqual(15077748194817838259, int(devices[0]["last_uid"]))
+
     def test_missing_device_uid_is_rejected(self) -> None:
         response = self.client.post("/cf3d/api/v1/commit", params={"device": "abc"})
         self.assertEqual(422, response.status_code)
@@ -1157,6 +1201,28 @@ class _RestAPITests(unittest.TestCase):
             params={"device_uid": "xyz", "device": "abc"},
         )
         self.assertEqual(422, response.status_code)
+
+    def test_negative_device_uid_is_rejected(self) -> None:
+        response = self.client.post(
+            "/cf3d/api/v1/commit",
+            params={"device_uid": "-1", "device": "abc"},
+        )
+        self.assertEqual(422, response.status_code)
+        self.assertEqual(
+            {"detail": "device_uid must be in range [0, 18446744073709551615]"},
+            response.json(),
+        )
+
+    def test_too_large_device_uid_is_rejected(self) -> None:
+        response = self.client.post(
+            "/cf3d/api/v1/commit",
+            params={"device_uid": "18446744073709551616", "device": "abc"},
+        )
+        self.assertEqual(422, response.status_code)
+        self.assertEqual(
+            {"detail": "device_uid must be in range [0, 18446744073709551615]"},
+            response.json(),
+        )
 
     def test_empty_device_is_rejected(self) -> None:
         response = self.client.post(

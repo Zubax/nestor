@@ -17,6 +17,10 @@ from nestor.model import CANFrame, CANFrameRecord, CANFrameRecordCommitted
 
 LOGGER = logging.getLogger(__name__)
 
+_SQLITE_INT64_MIN = -(1 << 63)
+_SQLITE_INT64_MAX = (1 << 63) - 1
+_UINT64_MAX = (1 << 64) - 1
+
 
 @dataclass(frozen=True)
 class Boot:
@@ -116,11 +120,12 @@ class SqliteDatabase(Database):
                 len(records),
             )
             try:
+                device_uid_db = _device_uid_to_sqlite_int64(device_uid)
                 cursor = self._connection.cursor()
                 cursor.execute("BEGIN IMMEDIATE")
                 device_id, previous_last_seqno, previous_device_uid = self._ensure_device(
                     cursor=cursor,
-                    device_uid=device_uid,
+                    device_uid=device_uid_db,
                     device=device,
                 )
                 if previous_device_uid != device_uid:
@@ -144,7 +149,7 @@ class SqliteDatabase(Database):
                             last_heard_ts=CAST(strftime('%s', 'now') AS INTEGER)
                         WHERE device_id=?
                         """,
-                        (device_uid, device_id),
+                        (device_uid_db, device_id),
                     )
                     cursor.execute("COMMIT")
                     LOGGER.info(
@@ -161,7 +166,7 @@ class SqliteDatabase(Database):
                     normalized_data = self._normalize_data(record.frame.data)
                     rows_to_insert.append(
                         (
-                            device_uid,
+                            device_uid_db,
                             device_id,
                             record.hw_ts_us,
                             record.boot_id,
@@ -253,7 +258,7 @@ class SqliteDatabase(Database):
                         last_heard_ts=CAST(strftime('%s', 'now') AS INTEGER)
                     WHERE device_id=?
                     """,
-                    (max_incoming_seqno, max_incoming_seqno, device_uid, device_id),
+                    (max_incoming_seqno, max_incoming_seqno, device_uid_db, device_id),
                 )
                 # Read back cached ACK inside the same transaction to guarantee the returned value reflects
                 # committed state seen by future commits.
@@ -314,7 +319,7 @@ class SqliteDatabase(Database):
                 DeviceInfo(
                     device=str(row[0]),
                     last_heard_ts=int(row[1]),
-                    last_uid=int(row[2]),
+                    last_uid=_sqlite_int64_to_device_uid(int(row[2])),
                 )
                 for row in cursor.fetchall()
             ]
@@ -580,7 +585,7 @@ class SqliteDatabase(Database):
         if row is None:
             LOGGER.error("Failed to load/create device row for %r", device)
             raise RuntimeError(f"failed to create or fetch device row for {device!r}")
-        resolved_uid = int(row[2])
+        resolved_uid = _sqlite_int64_to_device_uid(int(row[2]))
         return int(row[0]), int(row[1]), resolved_uid
 
     def _get_device_id(self, cursor: sqlite3.Cursor, device: str) -> int | None:
@@ -609,7 +614,7 @@ class SqliteDatabase(Database):
             cursor.execute(query, [device_id, *seqno_chunk])
             for row in cursor.fetchall():
                 result[int(row[0])] = _StoredFrameRow(
-                    device_uid=int(row[1]),
+                    device_uid=_sqlite_int64_to_device_uid(int(row[1])),
                     hw_ts_us=int(row[2]),
                     boot_id=int(row[3]),
                     can_id_with_flags=int(row[4]),
@@ -641,6 +646,24 @@ class SqliteDatabase(Database):
             LOGGER.debug("Transaction rollback completed")
         except sqlite3.Error:
             LOGGER.error("Rollback failed", exc_info=True)
+
+
+def _device_uid_to_sqlite_int64(device_uid: int) -> int:
+    value = int(device_uid)
+    if value < 0 or value > _UINT64_MAX:
+        raise ValueError(f"device_uid must be in uint64 range [0, {_UINT64_MAX}], got {value}")
+    if value <= _SQLITE_INT64_MAX:
+        return value
+    return value - (_UINT64_MAX + 1)
+
+
+def _sqlite_int64_to_device_uid(value: int) -> int:
+    out = int(value)
+    if out < _SQLITE_INT64_MIN or out > _SQLITE_INT64_MAX:
+        raise ValueError(f"SQLite INTEGER value out of int64 range: {out}")
+    if out >= 0:
+        return out
+    return out + (_UINT64_MAX + 1)
 
 
 def _chunked(values: Sequence[int], chunk_size: int) -> Iterable[list[int]]:
@@ -703,6 +726,43 @@ class _DatabaseTests(unittest.TestCase):
         self.assertEqual(2, second)
         stored = list(self.db.get_records("alpha", [10], None, None))
         self.assertEqual([1, 2], [record.seqno for record in stored])
+
+    def test_commit_uint64_device_uid_above_signed_range_round_trips(self) -> None:
+        uid = 15077748194817838259
+        latest = self.db.commit(
+            device_uid=uid,
+            device="alpha",
+            records=[_make_record(1, boot_id=10, data=b"\x01")],
+        )
+        self.assertEqual(1, latest)
+
+        devices = list(self.db.get_devices())
+        self.assertEqual(["alpha"], [item.device for item in devices])
+        self.assertEqual([uid], [item.last_uid for item in devices])
+
+        cursor = self.db._connection.cursor()
+        cursor.execute("SELECT last_device_uid FROM devices WHERE device='alpha'")
+        row = cursor.fetchone()
+        self.assertIsNotNone(row)
+        assert row is not None
+        self.assertEqual(_device_uid_to_sqlite_int64(uid), int(row[0]))
+
+        cursor.execute(
+            "SELECT device_uid FROM can_frames WHERE device_id=(SELECT device_id FROM devices WHERE device='alpha')"
+        )
+        row = cursor.fetchone()
+        self.assertIsNotNone(row)
+        assert row is not None
+        self.assertEqual(_device_uid_to_sqlite_int64(uid), int(row[0]))
+
+    def test_duplicate_commit_for_uint64_uid_keeps_mismatch_count_zero(self) -> None:
+        uid = 15077748194817838259
+        record = _make_record(1, boot_id=10, data=b"\x01")
+        self.db.commit(device_uid=uid, device="alpha", records=[record])
+        with self.assertLogs(__name__, level="INFO") as captured:
+            latest = self.db.commit(device_uid=uid, device="alpha", records=[record])
+        self.assertEqual(1, latest)
+        self.assertTrue(any("mismatches=0" in message for message in captured.output))
 
     def test_duplicate_mismatch_logs_warning_and_keeps_existing(self) -> None:
         original = _make_record(1, boot_id=10, hw_ts_us=111, can_id_with_flags=0x123, data=b"\x11")
@@ -977,6 +1037,24 @@ class _DatabaseTests(unittest.TestCase):
     def test_datetime_to_epoch_seconds_handles_aware_datetime(self) -> None:
         value = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         self.assertEqual(1704067200, _datetime_to_epoch_seconds(value))
+
+    def test_device_uid_int64_conversion_boundaries(self) -> None:
+        self.assertEqual(0, _device_uid_to_sqlite_int64(0))
+        self.assertEqual(_SQLITE_INT64_MAX, _device_uid_to_sqlite_int64(_SQLITE_INT64_MAX))
+        self.assertEqual(_SQLITE_INT64_MIN, _device_uid_to_sqlite_int64(_SQLITE_INT64_MAX + 1))
+        self.assertEqual(-1, _device_uid_to_sqlite_int64(_UINT64_MAX))
+
+        self.assertEqual(0, _sqlite_int64_to_device_uid(0))
+        self.assertEqual(_SQLITE_INT64_MAX, _sqlite_int64_to_device_uid(_SQLITE_INT64_MAX))
+        self.assertEqual(_SQLITE_INT64_MAX + 1, _sqlite_int64_to_device_uid(_SQLITE_INT64_MIN))
+        self.assertEqual(_UINT64_MAX, _sqlite_int64_to_device_uid(-1))
+
+        with self.assertRaisesRegex(ValueError, "uint64 range"):
+            _device_uid_to_sqlite_int64(-1)
+        with self.assertRaisesRegex(ValueError, "uint64 range"):
+            _device_uid_to_sqlite_int64(_UINT64_MAX + 1)
+        with self.assertRaisesRegex(ValueError, "out of int64 range"):
+            _sqlite_int64_to_device_uid(_SQLITE_INT64_MAX + 1)
 
 
 if __name__ == "__main__":
