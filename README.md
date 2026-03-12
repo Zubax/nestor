@@ -73,29 +73,29 @@ Open the API docs at the `/docs` endpoint in your browser, e.g., <http://localho
 
 ## Web GUI
 
-The server includes an optional web-based GUI for browsing CAN data. If the `gui/dist/` directory exists, it will be served at the root path (`/`).
+The server includes a web-based GUI for browsing CAN data. If the `gui/dist/` directory exists, it will be served at the root path (`/`).
 
-### Building the GUI
+### Quick Start
 
 ```bash
-cd gui
-npm install
-npm run build
+cd gui && npm install && npm run build
+cd ..
+nestor serve --db data/
+# Open http://localhost:8000
 ```
 
-The built files are output to `gui/dist/`. When the server starts, it automatically detects and serves them.
+Both the GUI and API are served from the same server — no separate frontend process needed.
 
-### Development
+### Frontend Development
 
-For frontend development with hot reload:
+For active frontend development with hot reload, run two processes:
 
 ```bash
-# Terminal 1: Run the API server
+# Terminal 1: API server
 nestor serve --db data/dev.db
 
-# Terminal 2: Run Vite dev server (proxies API to localhost:8000)
-cd gui
-npm run dev
+# Terminal 2: Vite dev server (proxies /cf3d/api/v1 to localhost:8000)
+cd gui && npm run dev
 # Open http://localhost:5173
 ```
 
