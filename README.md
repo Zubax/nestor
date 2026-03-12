@@ -10,6 +10,7 @@ _Data collection server for CF3D CAN black box recorders_
 [![PyPI - Version](https://img.shields.io/pypi/v/zubax-nestor)](https://pypi.org/project/zubax-nestor/)
 [![Website](https://img.shields.io/badge/website-zubax.com-black?color=e00000)](https://zubax.com/)
 [![Forum](https://img.shields.io/discourse/https/forum.zubax.com/users.svg?logo=discourse&color=e00000)](https://forum.zubax.com)
+[![Live](https://img.shields.io/badge/live-cyphalcloud.zubax.com-blue)](https://cyphalcloud.zubax.com/)
 
 </div>
 
