@@ -3,9 +3,11 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   server: {
     proxy: {
-      '/cf3d/api/v1': {
-        target: 'http://localhost:8000',
+      '/api': {
+        target: 'https://cyphalcloud.zubax.com',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/cf3d/api/v1'),
+        secure: true,
       },
     },
   },

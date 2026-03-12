@@ -4,7 +4,7 @@
 
 import type { DevicesResponse, BootsResponse, RecordsResponse } from './types';
 
-const BASE = '/cf3d/api/v1';
+const BASE = '/api';
 
 export const api = {
   async getDevices(): Promise<DevicesResponse> {
