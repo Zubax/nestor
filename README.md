@@ -71,6 +71,41 @@ nestor serve             # See --help for extra info.
 
 Open the API docs at the `/docs` endpoint in your browser, e.g., <http://localhost:8000/docs>.
 
+## Web GUI
+
+The server includes an optional web-based GUI for browsing CAN data. If the `gui/dist/` directory exists, it will be served at the root path (`/`).
+
+### Building the GUI
+
+```bash
+cd gui
+npm install
+npm run build
+```
+
+The built files are output to `gui/dist/`. When the server starts, it automatically detects and serves them.
+
+### Development
+
+For frontend development with hot reload:
+
+```bash
+# Terminal 1: Run the API server
+nestor serve --db data/dev.db
+
+# Terminal 2: Run Vite dev server (proxies API to localhost:8000)
+cd gui
+npm run dev
+# Open http://localhost:5173
+```
+
+### Features
+
+- Device selector dropdown
+- Boot session browser with timestamps
+- CAN records table with filtering
+- Mobile-responsive layout
+
 Run behind a local gateway via Unix socket:
 
 ```bash
