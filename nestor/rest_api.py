@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from nestor.database import Boot, Database, DeviceInfo, SqliteDatabase
@@ -718,7 +719,7 @@ def _close_database(database: Database) -> None:
         LOGGER.error("Failed to close database during app shutdown: type=%s", type(database).__name__, exc_info=True)
 
 
-def create_app(database: Database) -> FastAPI:
+def create_app(database: Database, gui_dir: Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(_app: FastAPI):
         try:
@@ -730,6 +731,15 @@ def create_app(database: Database) -> FastAPI:
     created_app = FastAPI(lifespan=_lifespan)
     created_app.state.database = database
     created_app.include_router(router)
+
+    # Serve GUI static files if directory exists
+    if gui_dir is None:
+        gui_dir = Path(__file__).parent.parent / "gui" / "dist"
+    if gui_dir.is_dir():
+        LOGGER.info("Mounting GUI static files from %s", gui_dir)
+        created_app.mount("/", StaticFiles(directory=gui_dir, html=True), name="gui")
+    else:
+        LOGGER.info("GUI directory not found at %s, skipping static file mount", gui_dir)
 
     LOGGER.info("REST API app created with database backend=%s", type(database).__name__)
     return created_app
