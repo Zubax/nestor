@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <meta
+            http-equiv="Cache-Control"
+            content="no-cache, no-store, must-revalidate"
+        />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <title>Nestor — CF3D CAN Data Viewer</title>
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html,
+            body {
+                height: 100%;
+                overflow: hidden;
+            }
+            body {
+                background: #1e1e1e;
+                color: #fff;
+                font-family: "Ubuntu Mono", "Consolas", "Monaco", monospace;
+                font-size: 12px;
+                display: flex;
+                flex-direction: column;
+            }
+            @media (max-width: 768px) {
+                body {
+                    font-size: 14px;
+                }
+            }
+
+            #top-bar {
+                height: 42px;
+                background: #2a2a2a;
+                border-bottom: 1px solid #444;
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                gap: 16px;
+                flex-shrink: 0;
+            }
+            @media (max-width: 768px) {
+                #top-bar {
+                    height: auto;
+                    min-height: 42px;
+                    flex-wrap: wrap;
+                    padding: 8px 12px;
+                    gap: 8px;
+                }
+            }
+            #top-bar h1 {
+                font-size: 14px;
+                font-weight: bold;
+                color: #f1c40f;
+            }
+            #top-bar select {
+                background: #333;
+                color: #fff;
+                border: 1px solid #555;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-family: inherit;
+                font-size: 11px;
+                cursor: pointer;
+            }
+            @media (max-width: 768px) {
+                #top-bar select {
+                    flex: 1;
+                    min-width: 120px;
+                    padding: 8px 12px;
+                    font-size: 14px;
+                }
+            }
+            #top-bar select:hover {
+                border-color: #777;
+            }
+            #top-bar .status {
+                margin-left: auto;
+                color: #888;
+                font-size: 11px;
+            }
+            @media (max-width: 768px) {
+                #top-bar .status {
+                    width: 100%;
+                    text-align: center;
+                    font-size: 12px;
+                }
+            }
+            #top-bar .status.connected {
+                color: #27ae60;
+            }
+            #top-bar .status.error {
+                color: #e74c3c;
+            }
+
+            #main-area {
+                flex: 1;
+                display: flex;
+                overflow: hidden;
+            }
+            @media (max-width: 768px) {
+                #main-area {
+                    flex-direction: column;
+                }
+            }
+
+            #side-panel {
+                width: 280px;
+                background: #222;
+                border-right: 1px solid #444;
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                overflow: hidden;
+            }
+            @media (max-width: 768px) {
+                #side-panel {
+                    width: 100%;
+                    max-height: 200px;
+                    border-right: none;
+                    border-bottom: 1px solid #444;
+                    flex-direction: row;
+                }
+            }
+            #side-panel-toggle {
+                display: none;
+                width: 100%;
+                background: #333;
+                color: #fff;
+                border: none;
+                padding: 10px;
+                font-size: 14px;
+                cursor: pointer;
+                border-bottom: 1px solid #444;
+            }
+            @media (max-width: 768px) {
+                #side-panel-toggle {
+                    display: block;
+                }
+                #side-panel.collapsed {
+                    max-height: 0;
+                    overflow: hidden;
+                    border-bottom: none;
+                }
+            }
+            .panel-section {
+                border-bottom: 1px solid #444;
+                padding: 8px;
+            }
+            @media (max-width: 768px) {
+                .panel-section {
+                    flex: 1;
+                    border-bottom: none;
+                    border-right: 1px solid #444;
+                    overflow: hidden;
+                }
+                .panel-section:last-child {
+                    border-right: none;
+                }
+            }
+            .panel-section h3 {
+                font-size: 11px;
+                color: #888;
+                text-transform: uppercase;
+                margin-bottom: 8px;
+            }
+            .device-list,
+            .boot-list {
+                list-style: none;
+                max-height: 180px;
+                overflow-y: auto;
+            }
+            @media (max-width: 768px) {
+                .device-list,
+                .boot-list {
+                    max-height: 120px;
+                }
+            }
+            .device-list li,
+            .boot-list li {
+                padding: 6px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+            @media (max-width: 768px) {
+                .device-list li,
+                .boot-list li {
+                    padding: 10px 12px;
+                }
+            }
+            .device-list li:hover,
+            .boot-list li:hover {
+                background: #333;
+            }
+            .device-list li.selected,
+            .boot-list li.selected {
+                background: #3498db;
+            }
+            .device-list .device-name,
+            .boot-list .boot-id {
+                font-weight: bold;
+                font-size: 11px;
+            }
+            .device-list .device-meta,
+            .boot-list .boot-meta {
+                font-size: 9px;
+                color: #888;
+            }
+            .device-list li.selected .device-meta,
+            .boot-list li.selected .boot-meta {
+                color: #ccc;
+            }
+
+            #content-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            #timeline-container {
+                height: 220px;
+                background: #1a1a1a;
+                border-bottom: 1px solid #444;
+                position: relative;
+                flex-shrink: 0;
+            }
+            @media (max-width: 768px) {
+                #timeline-container {
+                    height: 150px;
+                    min-height: 100px;
+                }
+            }
+            #timeline-resize {
+                height: 5px;
+                cursor: ns-resize;
+                background: transparent;
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+            #timeline-resize:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            #timeline-canvas {
+                display: block;
+                width: 100%;
+                height: calc(100% - 5px);
+                touch-action: none;
+            }
+            #timeline-tooltip {
+                position: absolute;
+                display: none;
+                pointer-events: none;
+                background: #333;
+                border: 1px solid #555;
+                padding: 4px 8px;
+                font-size: 11px;
+                color: #fff;
+                border-radius: 3px;
+                z-index: 10;
+                white-space: pre;
+            }
+
+            #records-container {
+                flex: 1;
+                background: #1e1e1e;
+                overflow: auto;
+            }
+            #records-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 11px;
+            }
+            @media (max-width: 768px) {
+                #records-table {
+                    font-size: 12px;
+                }
+            }
+            #records-table th {
+                background: #2a2a2a;
+                position: sticky;
+                top: 0;
+                padding: 6px 8px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 1px solid #444;
+                z-index: 1;
+            }
+            @media (max-width: 768px) {
+                #records-table th {
+                    padding: 10px 6px;
+                    font-size: 11px;
+                }
+            }
+            #records-table td {
+                padding: 4px 8px;
+                border-bottom: 1px solid #333;
+                white-space: nowrap;
+            }
+            @media (max-width: 768px) {
+                #records-table td {
+                    padding: 8px 6px;
+                }
+            }
+            /* Hide less important columns on mobile */
+            @media (max-width: 600px) {
+                #records-table th:nth-child(2),
+                #records-table td:nth-child(2),
+                #records-table th:nth-child(4),
+                #records-table td:nth-child(4),
+                #records-table th:nth-child(5),
+                #records-table td:nth-child(5) {
+                    display: none;
+                }
+            }
+            #records-table tr:hover td {
+                background: #2a2a2a;
+            }
+            #records-table tr.selected td {
+                background: #2c3e50;
+            }
+            .mono {
+                font-family: "Ubuntu Mono", "Consolas", monospace;
+            }
+            .can-id {
+                color: #f1c40f;
+            }
+            .can-data {
+                color: #3498db;
+            }
+            .timestamp {
+                color: #888;
+            }
+
+            #status-bar {
+                height: 24px;
+                line-height: 24px;
+                background: #2a2a2a;
+                border-top: 1px solid #444;
+                padding: 0 12px;
+                font-size: 11px;
+                color: #888;
+                flex-shrink: 0;
+                display: flex;
+                justify-content: space-between;
+            }
+            @media (max-width: 768px) {
+                #status-bar {
+                    height: 32px;
+                    line-height: 32px;
+                    font-size: 12px;
+                    padding: 0 8px;
+                }
+            }
+
+            .empty-state {
+                color: #555;
+                font-style: italic;
+                padding: 16px;
+                text-align: center;
+            }
+
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            ::-webkit-scrollbar-track {
+                background: #1a1a1a;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #444;
+                border-radius: 4px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+
+            /* Touch-friendly scrolling */
+            @media (max-width: 768px) {
+                #records-container {
+                    -webkit-overflow-scrolling: touch;
+                    overflow-x: auto;
+                }
+                #timeline-canvas {
+                    touch-action: pan-x pan-y pinch-zoom;
+                }
+            }
+
+            /* Improve tap targets on mobile */
+            @media (max-width: 768px) {
+                .device-list li,
+                .boot-list li {
+                    min-height: 44px;
+                    justify-content: center;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="top-bar">
+            <h1>🔌 Nestor</h1>
+            <select id="device-select">
+                <option value="">Select device...</option>
+            </select>
+            <select id="boot-select" disabled>
+                <option value="">Select boot...</option>
+            </select>
+            <span id="connection-status" class="status">Connecting...</span>
+        </div>
+
+        <div id="main-area">
+            <button id="side-panel-toggle">☰ Devices & Boots</button>
+            <div id="side-panel">
+                <div class="panel-section">
+                    <h3>Devices</h3>
+                    <ul id="device-list" class="device-list"></ul>
+                </div>
+                <div class="panel-section" style="flex: 1; overflow: hidden">
+                    <h3>Boot Sessions</h3>
+                    <ul id="boot-list" class="boot-list"></ul>
+                </div>
+            </div>
+
+            <div id="content-area">
+                <div id="timeline-container">
+                    <canvas id="timeline-canvas"></canvas>
+                    <div id="timeline-tooltip"></div>
+                    <div id="timeline-resize"></div>
+                </div>
+
+                <div id="records-container">
+                    <table id="records-table">
+                        <thead>
+                            <tr>
+                                <th>Time (µs)</th>
+                                <th>Seq#</th>
+                                <th>CAN ID</th>
+                                <th>Ext</th>
+                                <th>RTR</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="status-bar">
+            <span id="status-left">Ready</span>
+            <span id="status-right"></span>
+        </div>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

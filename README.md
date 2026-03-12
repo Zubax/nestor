@@ -10,6 +10,7 @@ _Data collection server for CF3D CAN black box recorders_
 [![PyPI - Version](https://img.shields.io/pypi/v/zubax-nestor)](https://pypi.org/project/zubax-nestor/)
 [![Website](https://img.shields.io/badge/website-zubax.com-black?color=e00000)](https://zubax.com/)
 [![Forum](https://img.shields.io/discourse/https/forum.zubax.com/users.svg?logo=discourse&color=e00000)](https://forum.zubax.com)
+[![Live](https://img.shields.io/badge/live-cyphalcloud.zubax.com-blue)](https://cyphalcloud.zubax.com/)
 
 </div>
 
@@ -70,6 +71,41 @@ nestor serve             # See --help for extra info.
 ```
 
 Open the API docs at the `/docs` endpoint in your browser, e.g., <http://localhost:8000/docs>.
+
+## Web GUI
+
+The server includes a web-based GUI for browsing CAN data. If the `gui/dist/` directory exists, it will be served at the root path (`/`).
+
+### Quick Start
+
+```bash
+cd gui && npm install && npm run build
+cd ..
+nestor serve --db data/
+# Open http://localhost:8000
+```
+
+Both the GUI and API are served from the same server — no separate frontend process needed.
+
+### Frontend Development
+
+For active frontend development with hot reload, run two processes:
+
+```bash
+# Terminal 1: API server
+nestor serve --db data/dev.db
+
+# Terminal 2: Vite dev server (proxies /cf3d/api/v1 to localhost:8000)
+cd gui && npm run dev
+# Open http://localhost:5173
+```
+
+### Features
+
+- Device selector dropdown
+- Boot session browser with timestamps
+- CAN records table with filtering
+- Mobile-responsive layout
 
 Run behind a local gateway via Unix socket:
 
