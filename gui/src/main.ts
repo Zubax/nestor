@@ -14,6 +14,18 @@ let records: Record[] = [];
 let selectedDevice: string | null = null;
 let selectedBoot: number | null = null;
 
+// Persistent cache backed by sessionStorage
+const cache = {
+  get<T>(key: string): T | null {
+    const raw = sessionStorage.getItem(`nestor:${key}`);
+    if (!raw) return null;
+    try { return JSON.parse(raw) as T; } catch { return null; }
+  },
+  set(key: string, value: unknown): void {
+    sessionStorage.setItem(`nestor:${key}`, JSON.stringify(value));
+  },
+};
+
 // Components
 let timeline: Timeline;
 
@@ -99,12 +111,22 @@ function init(): void {
 // ---------------------------------------------------------------------------
 
 async function loadDevices(): Promise<void> {
+  const cached = cache.get<Device[]>("devices");
+  if (cached) {
+    devices = cached;
+    connectionStatus.textContent = `${devices.length} device(s)`;
+    connectionStatus.className = "status connected";
+    updateDeviceList();
+    statusLeft.textContent = `Loaded ${devices.length} device(s) (cached)`;
+    return;
+  }
   try {
     connectionStatus.textContent = "Connecting...";
     connectionStatus.className = "status";
 
     const res = await api.getDevices();
     devices = res.devices || [];
+    cache.set("devices", devices);
 
     connectionStatus.textContent = `${devices.length} device(s)`;
     connectionStatus.className = "status connected";
@@ -121,10 +143,18 @@ async function loadDevices(): Promise<void> {
 }
 
 async function loadBoots(device: string): Promise<void> {
+  const cached = cache.get<Boot[]>(`boots:${device}`);
+  if (cached) {
+    boots = cached;
+    updateBootList();
+    statusLeft.textContent = `${boots.length} boot session(s) (cached)`;
+    return;
+  }
   try {
     statusLeft.textContent = "Loading boots...";
     const res = await api.getBoots(device);
     boots = res.boots || [];
+    cache.set(`boots:${device}`, boots);
     updateBootList();
     statusLeft.textContent = `${boots.length} boot session(s)`;
   } catch (err) {
@@ -134,10 +164,21 @@ async function loadBoots(device: string): Promise<void> {
 }
 
 async function loadRecords(device: string, bootId: number): Promise<void> {
+  const cacheKey = `records:${device}:${bootId}`;
+  const cached = cache.get<Record[]>(cacheKey);
+  if (cached) {
+    records = cached;
+    updateRecordsTable();
+    updateTimeline();
+    statusLeft.textContent = `${records.length} CAN message(s) (cached)`;
+    statusRight.textContent = `Boot #${bootId}`;
+    return;
+  }
   try {
     statusLeft.textContent = "Loading records...";
     const res = await api.getRecords(device, [bootId], { limit: 1000 });
     records = res.records || [];
+    cache.set(cacheKey, records);
 
     updateRecordsTable();
     updateTimeline();
@@ -289,21 +330,22 @@ function updateRecordsTable(): void {
     return;
   }
 
+  const html: string[] = [];
   for (const r of records) {
-    const tr = document.createElement("tr");
-    tr.dataset.seqno = r.seqno.toString();
     const canIdStr =
       "0x" + r.frame.can_id.toString(16).toUpperCase().padStart(3, "0");
-    tr.innerHTML = `
-      <td class="mono timestamp">${r.hw_ts_us.toLocaleString()}</td>
-      <td class="mono">${r.seqno}</td>
-      <td class="mono can-id">${canIdStr}</td>
-      <td>${r.frame.extended ? "✓" : ""}</td>
-      <td>${r.frame.rtr ? "✓" : ""}</td>
-      <td class="mono can-data">${r.frame.data_hex.toUpperCase()}</td>
-    `;
-    recordsBody.appendChild(tr);
+    html.push(
+      `<tr data-seqno="${r.seqno}">`,
+      `<td class="mono timestamp">${r.hw_ts_us.toLocaleString()}</td>`,
+      `<td class="mono">${r.seqno}</td>`,
+      `<td class="mono can-id">${canIdStr}</td>`,
+      `<td>${r.frame.extended ? "✓" : ""}</td>`,
+      `<td>${r.frame.rtr ? "✓" : ""}</td>`,
+      `<td class="mono can-data">${r.frame.data_hex.toUpperCase()}</td>`,
+      `</tr>`,
+    );
   }
+  recordsBody.innerHTML = html.join("");
 }
 
 function updateTimeline(): void {
