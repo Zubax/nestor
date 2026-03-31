@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """
-Capture DroneCAN CAN frames and commit them to Nestor (Cyphal Cloud).
-
-Two modes of operation:
-  live     -- Listen on a CAN interface and commit frames in real time.
-  upload   -- Commit a previously recorded .cf3d file to the server.
+Capture DroneCAN CAN frames and commit them to Nestor (Cyphal Cloud) in real time.
 
 Requires the Nestor library (for fec_envelope) to be importable.
 Install: pip install -e /path/to/nestor   OR   set NESTOR_PATH.
 
 Usage:
-    # Real-time capture and commit
-    python commit_traffic.py live --iface vcan0 --device my-drone --device-uid 0x1
+    python commit_traffic.py --iface vcan0 --device my-drone --device-uid 0x1
 
-    # Upload a recorded file later
-    python commit_traffic.py upload traffic.cf3d --device my-drone --device-uid 0x1
+For uploading recorded .cf3d files, use ``nestor_ingest`` from the tools directory.
 """
 
 import argparse
@@ -23,7 +17,6 @@ import os
 import struct
 import sys
 import time
-from pathlib import Path
 
 import requests
 
@@ -170,73 +163,23 @@ def cmd_live(args):
 
 
 # ---------------------------------------------------------------------------
-# Subcommand: upload
-# ---------------------------------------------------------------------------
-
-
-def cmd_upload(args):
-    filepath = Path(args.file)
-    if not filepath.exists():
-        sys.exit(f"File not found: {filepath}")
-
-    data = filepath.read_bytes()
-    if len(data) % RECORD_BYTES != 0:
-        LOG.warning("File size %d is not a multiple of %d; trailing bytes will be ignored", len(data), RECORD_BYTES)
-        data = data[: len(data) - (len(data) % RECORD_BYTES)]
-
-    total = len(data) // RECORD_BYTES
-    if total == 0:
-        sys.exit("No complete CF3D records in file")
-
-    LOG.info(
-        "UPLOAD: %s (%d records) -> %s device=%s uid=%s", filepath, total, args.server, args.device, args.device_uid
-    )
-
-    batch_bytes = args.batch_size * RECORD_BYTES
-    committed = 0
-    failed = 0
-    for offset in range(0, len(data), batch_bytes):
-        chunk = data[offset : offset + batch_bytes]
-        n = len(chunk) // RECORD_BYTES
-        if commit_batch(args.server, args.device, args.device_uid, chunk):
-            committed += n
-        else:
-            failed += n
-        LOG.info("Progress: %d / %d", committed + failed, total)
-
-    LOG.info("Done: committed=%d failed=%d total=%d", committed, failed, total)
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Capture DroneCAN traffic and commit to Nestor (Cyphal Cloud)")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    # --- live ---
-    p_live = sub.add_parser("live", help="Capture and commit in real time")
-    p_live.add_argument("--iface", default="vcan0")
-    p_live.add_argument("--node-id", type=int, default=127)
-    p_live.add_argument("--device", default="local")
-    p_live.add_argument("--device-uid", required=True)
-    p_live.add_argument("--server", default="https://cyphalcloud.zubax.com")
-    p_live.add_argument("--batch-size", type=int, default=100)
-    p_live.add_argument("--flush-interval", type=float, default=5.0)
-    p_live.add_argument("--boot-id", type=int, default=None)
-
-    # --- upload ---
-    p_up = sub.add_parser("upload", help="Upload a recorded .cf3d file to Nestor")
-    p_up.add_argument("file", help="Path to .cf3d file")
-    p_up.add_argument("--device", default="local")
-    p_up.add_argument("--device-uid", required=True)
-    p_up.add_argument("--server", default="https://cyphalcloud.zubax.com")
-    p_up.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--iface", default="vcan0")
+    parser.add_argument("--node-id", type=int, default=127)
+    parser.add_argument("--device", default="local")
+    parser.add_argument("--device-uid", required=True)
+    parser.add_argument("--server", default="https://cyphalcloud.zubax.com")
+    parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--flush-interval", type=float, default=5.0)
+    parser.add_argument("--boot-id", type=int, default=None)
 
     args = parser.parse_args()
-    {"live": cmd_live, "upload": cmd_upload}[args.command](args)
+    cmd_live(args)
 
 
 if __name__ == "__main__":
