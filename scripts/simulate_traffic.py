@@ -8,17 +8,17 @@ import dronecan
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Simulate DroneCAN traffic for plotting')
-    parser.add_argument('--iface', default='vcan0', help='CAN interface (default: vcan0)')
-    parser.add_argument('--node-id', type=int, default=10, help='Node ID (default: 10)')
-    parser.add_argument('--rate', type=float, default=10.0, help='Message rate in Hz (default: 10)')
+    parser = argparse.ArgumentParser(description="Simulate DroneCAN traffic for plotting")
+    parser.add_argument("--iface", default="vcan0", help="CAN interface (default: vcan0)")
+    parser.add_argument("--node-id", type=int, default=10, help="Node ID (default: 10)")
+    parser.add_argument("--rate", type=float, default=10.0, help="Message rate in Hz (default: 10)")
     args = parser.parse_args()
 
     node = dronecan.make_node(args.iface, node_id=args.node_id)
     period = 1.0 / args.rate
 
-    print(f'Publishing on {args.iface} as node {args.node_id} at {args.rate} Hz')
-    print('Press Ctrl+C to stop')
+    print(f"Publishing on {args.iface} as node {args.node_id} at {args.rate} Hz")
+    print("Press Ctrl+C to stop")
 
     try:
         while True:
@@ -60,8 +60,8 @@ def main():
 
             node.spin(period)
     except KeyboardInterrupt:
-        print('\nStopped')
+        print("\nStopped")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
