@@ -1,0 +1,3 @@
+dronecan>=1.0
+-e ..  # nestor (local checkout)
+requests>=2.25

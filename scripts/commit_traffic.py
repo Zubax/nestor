@@ -51,8 +51,7 @@ LOG = logging.getLogger(__name__)
 CAN_EFF_FLAG = 0x80000000
 
 
-def pack_cf3d_record(boot_id: int, seqno: int, hw_ts_us: int,
-                     can_id_with_flags: int, data: bytes) -> bytes:
+def pack_cf3d_record(boot_id: int, seqno: int, hw_ts_us: int, can_id_with_flags: int, data: bytes) -> bytes:
     """Build one 256-byte CF3D record from a raw CAN frame."""
     if len(data) > 64:
         raise ValueError(f"CAN payload too long: {len(data)} > 64")
@@ -61,12 +60,11 @@ def pack_cf3d_record(boot_id: int, seqno: int, hw_ts_us: int,
     struct.pack_into("<QQQ", buf, 8, boot_id, seqno, hw_ts_us)
     struct.pack_into("<I", buf, 36, can_id_with_flags)
     buf[40] = len(data)
-    buf[41:41 + len(data)] = data
+    buf[41 : 41 + len(data)] = data
     return box(bytes(buf))
 
 
-def commit_batch(server: str, device: str, device_uid: str,
-                 payload: bytes) -> bool:
+def commit_batch(server: str, device: str, device_uid: str, payload: bytes) -> bool:
     """POST binary CF3D payload to the Nestor /commit endpoint."""
     url = f"{server}/cf3d/api/v1/commit"
     params = {"device": device, "device_uid": device_uid}
@@ -97,24 +95,27 @@ def commit_batch(server: str, device: str, device_uid: str,
 # Shared CAN capture logic used by both "live" and "record" subcommands.
 # ---------------------------------------------------------------------------
 
+
 def _make_capture_hook(boot_id, t0, state, on_record):
     """Return a CAN driver IO hook that encodes frames and calls on_record(bytes)."""
+
     def frame_hook(direction, frame):
         can_id = frame.id
         data = bytes(frame.data)
         can_id_with_flags = can_id | (CAN_EFF_FLAG if frame.extended else 0)
         hw_ts_us = int((frame.ts_monotonic - t0) * 1_000_000)
         state["seqno"] += 1
-        record = pack_cf3d_record(boot_id, state["seqno"], hw_ts_us,
-                                  can_id_with_flags, data)
+        record = pack_cf3d_record(boot_id, state["seqno"], hw_ts_us, can_id_with_flags, data)
         state["captured"] += 1
         on_record(record)
+
     return frame_hook
 
 
 # ---------------------------------------------------------------------------
 # Subcommand: live
 # ---------------------------------------------------------------------------
+
 
 def cmd_live(args):
     import dronecan
@@ -146,10 +147,10 @@ def cmd_live(args):
 
     hook = _make_capture_hook(boot_id, t0, state, on_record)
 
-    LOG.info("LIVE: %s (node %d) -> %s device=%s uid=%s",
-             args.iface, args.node_id, args.server, args.device, args.device_uid)
-    LOG.info("Boot ID: %d | Batch: %d frames | Flush: %.1fs",
-             boot_id, args.batch_size, args.flush_interval)
+    LOG.info(
+        "LIVE: %s (node %d) -> %s device=%s uid=%s", args.iface, args.node_id, args.server, args.device, args.device_uid
+    )
+    LOG.info("Boot ID: %d | Batch: %d frames | Flush: %.1fs", boot_id, args.batch_size, args.flush_interval)
 
     hook_handle = node.can_driver.add_io_hook(hook)
     try:
@@ -165,13 +166,13 @@ def cmd_live(args):
     except KeyboardInterrupt:
         hook_handle.remove()
         flush()
-        LOG.info("Stats: captured=%d committed=%d failed=%d",
-                 state["captured"], state["committed"], state["failed"])
+        LOG.info("Stats: captured=%d committed=%d failed=%d", state["captured"], state["committed"], state["failed"])
 
 
 # ---------------------------------------------------------------------------
 # Subcommand: upload
 # ---------------------------------------------------------------------------
+
 
 def cmd_upload(args):
     filepath = Path(args.file)
@@ -180,22 +181,22 @@ def cmd_upload(args):
 
     data = filepath.read_bytes()
     if len(data) % RECORD_BYTES != 0:
-        LOG.warning("File size %d is not a multiple of %d; trailing bytes will be ignored",
-                    len(data), RECORD_BYTES)
-        data = data[:len(data) - (len(data) % RECORD_BYTES)]
+        LOG.warning("File size %d is not a multiple of %d; trailing bytes will be ignored", len(data), RECORD_BYTES)
+        data = data[: len(data) - (len(data) % RECORD_BYTES)]
 
     total = len(data) // RECORD_BYTES
     if total == 0:
         sys.exit("No complete CF3D records in file")
 
-    LOG.info("UPLOAD: %s (%d records) -> %s device=%s uid=%s",
-             filepath, total, args.server, args.device, args.device_uid)
+    LOG.info(
+        "UPLOAD: %s (%d records) -> %s device=%s uid=%s", filepath, total, args.server, args.device, args.device_uid
+    )
 
     batch_bytes = args.batch_size * RECORD_BYTES
     committed = 0
     failed = 0
     for offset in range(0, len(data), batch_bytes):
-        chunk = data[offset:offset + batch_bytes]
+        chunk = data[offset : offset + batch_bytes]
         n = len(chunk) // RECORD_BYTES
         if commit_batch(args.server, args.device, args.device_uid, chunk):
             committed += n
@@ -210,9 +211,9 @@ def cmd_upload(args):
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Capture DroneCAN traffic and commit to Nestor (Cyphal Cloud)")
+    parser = argparse.ArgumentParser(description="Capture DroneCAN traffic and commit to Nestor (Cyphal Cloud)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     # --- live ---
